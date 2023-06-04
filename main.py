@@ -4,18 +4,48 @@ macropad = MacroPad()
 
 state = {
     "last_position": 0,
-    "mode": 1,
+    "mode": 0,
     "mode_select": False,
     "brightness": 0.1,
     "color": {
-        "r": 250,
-        "g": 35,
-        "b": 0
+        "h": 0.93,
+        "s": 1,
+        "v": 0.2
     },
     "pressed_keys": set()
 }
 
+scalar = float  # a scale value (0.0 to 1.0)
+
+
+def hsv_to_rgb(h: scalar, s: scalar, v: scalar) -> tuple:
+    if s:
+        if h == 1.0:
+            h = 0.0
+        i = int(h*6.0)
+        f = h*6.0 - i
+
+        w = v * (1.0 - s)
+        q = v * (1.0 - s * f)
+        t = v * (1.0 - s * (1.0 - f))
+
+        if i == 0:
+            return (v*255, t*255, w*255)
+        if i == 1:
+            return (q*255, v*255, w*255)
+        if i == 2:
+            return (w*255, v*255, t*255)
+        if i == 3:
+            return (w*255, q*255, v*255)
+        if i == 4:
+            return (t*255, w*255, v*255)
+        if i == 5:
+            return (v*255, w*255, q*255)
+    else:
+        return (v*255, v*255, v*255)
+
 # NUM PAD
+
 
 num_map = [
     macropad.Keycode.SEVEN,
@@ -132,10 +162,10 @@ def media_controls(key_events):
 
 
 def rgb_view():
-    text_lines = macropad.display_text(title="RGB")
+    text_lines = macropad.display_text(title="HSV Crap")
 
-    text_lines[0].text = "R {} - G {} - B{}".format(
-        state["color"]["r"], state["color"]["g"], state["color"]["b"])
+    text_lines[0].text = "H {} - S {} - V{}".format(
+        state["color"]["h"], state["color"]["s"], state["color"]["v"])
     text_lines[1].text = "Brightness {}".format(state["brightness"])
 
     text_lines.show()
@@ -147,22 +177,22 @@ def rgb(key_events):
     if macropad.encoder > state["last_position"]:
         state["last_position"] = encoder_pos
         if 0 in state["pressed_keys"]:
-            state["color"]["r"] = (state["color"]["r"] + 10) % 255
+            state["color"]["h"] = round((state["color"]["h"] + 0.01) % 1, 2)
         if 1 in state["pressed_keys"]:
-            state["color"]["g"] = (state["color"]["g"] + 10) % 255
+            state["color"]["s"] = round((state["color"]["s"] + 0.1) % 1, 1)
         if 2 in state["pressed_keys"]:
-            state["color"]["b"] = (state["color"]["b"] + 10) % 255
+            state["color"]["v"] = round((state["color"]["v"] + 0.1) % 1, 1)
         if 3 in state["pressed_keys"]:
             state["brightness"] = round((state["brightness"] + 0.02) % 1, 2)
         rgb_view()
 
     if macropad.encoder < state["last_position"]:
         if 0 in state["pressed_keys"]:
-            state["color"]["r"] = (state["color"]["r"] - 10) % 255
+            state["color"]["h"] = round((state["color"]["h"] - 0.01) % 1, 2)
         if 1 in state["pressed_keys"]:
-            state["color"]["g"] = (state["color"]["g"] - 10) % 255
+            state["color"]["s"] = round((state["color"]["s"] - 0.1) % 1, 1)
         if 2 in state["pressed_keys"]:
-            state["color"]["b"] = (state["color"]["b"] - 10) % 255
+            state["color"]["v"] = round((state["color"]["v"] - 0.1) % 1, 1)
         if 3 in state["pressed_keys"]:
             state["brightness"] = round((state["brightness"] - 0.02) % 1, 2)
 
@@ -173,7 +203,7 @@ def rgb(key_events):
 
 
 modes = [
-    {"title": "RGB Crap", "func": rgb, "view": rgb_view},
+    {"title": "HSV Crap", "func": rgb, "view": rgb_view},
     {"title": "Media Controls", "func": media_controls, "view": media_view},
     {"title": "Num Pad", "func": num_pad, "view": num_pad_view}
 ]
@@ -182,10 +212,10 @@ modes = [
 modes[state["mode"]]["view"]()
 
 while True:
-
     macropad.pixels.brightness = state["brightness"]
     macropad.pixels.fill(
-        (state["color"]["r"], state["color"]["g"], state["color"]["b"]))
+        hsv_to_rgb(state["color"]["h"],
+                   state["color"]["s"], state["color"]["v"]))
 
     key_events = macropad.keys.events.get()
     if key_events:
