@@ -1,4 +1,5 @@
 from adafruit_macropad import MacroPad
+from adafruit_ticks import ticks_ms, ticks_add, ticks_less
 
 macropad = MacroPad()
 
@@ -12,6 +13,9 @@ state = {
         "s": 1,
         "v": 0.2
     },
+    "color_mode": "solid",
+    "offset": 0,
+    "speed": 20,
     "pressed_keys": set()
 }
 
@@ -167,8 +171,14 @@ def rgb_view():
     text_lines[0].text = "H {} - S {} - V{}".format(
         state["color"]["h"], state["color"]["s"], state["color"]["v"])
     text_lines[1].text = "Brightness {}".format(state["brightness"])
-
+    text_lines[2].text = "Mode: {}".format(state["color_mode"])
     text_lines.show()
+
+
+color_mode_map = {
+    6: "solid",
+    7: "cycle"
+}
 
 
 def rgb(key_events):
@@ -199,6 +209,13 @@ def rgb(key_events):
         state["last_position"] = encoder_pos
         rgb_view()
 
+    if key_events:
+        if key_events.pressed:
+            if key_events.key_number == 6:
+                state["color_mode"] = "solid"
+            if key_events.key_number == 7:
+                state["color_mode"] = "cycle"
+        rgb_view()
 # MAIN LOOP
 
 
@@ -211,11 +228,23 @@ modes = [
 
 modes[state["mode"]]["view"]()
 
+tick = 0
+
 while True:
-    macropad.pixels.brightness = state["brightness"]
-    macropad.pixels.fill(
-        hsv_to_rgb(state["color"]["h"],
-                   state["color"]["s"], state["color"]["v"]))
+    if state["color_mode"] == "solid":
+        macropad.pixels.brightness = state["brightness"]
+        macropad.pixels.fill(
+            hsv_to_rgb(state["color"]["h"],
+                       state["color"]["s"], state["color"]["v"]))
+    elif state["color_mode"] == "cycle":
+        macropad.pixels.brightness = state["brightness"]
+        macropad.pixels.fill(
+            hsv_to_rgb((state["color"]["h"]+state["offset"]) % 1,
+                       state["color"]["s"], state["color"]["v"]))
+
+        if ticks_ms() - tick > state["speed"]:
+            state["offset"] += 0.005
+            tick = ticks_ms()
 
     key_events = macropad.keys.events.get()
     if key_events:
