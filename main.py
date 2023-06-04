@@ -1,14 +1,19 @@
 from adafruit_macropad import MacroPad
 
-
 macropad = MacroPad()
 
-
-last_position = 0
-current_mode = 1
-mode_select = False
-brightness = 0.1
-color = (100, 50, 150)
+state = {
+    "last_position": 0,
+    "mode": 1,
+    "mode_select": False,
+    "brightness": 0.1,
+    "color": {
+        "r": 250,
+        "g": 35,
+        "b": 0
+    },
+    "pressed_keys": set()
+}
 
 # NUM PAD
 
@@ -39,16 +44,16 @@ def num_pad_view():
     text_lines.show()
 
 
-def num_pad():
-    key_event = macropad.keys.events.get()
-    if key_event:
-        if key_event.pressed:
-            macropad.keyboard.send(num_map[key_event.key_number])
+def num_pad(key_events):
+    if key_events:
+        if key_events.pressed:
+            macropad.keyboard.send(num_map[key_events.key_number])
 
 
 # MODE SELECTION
 
 def mode_select_view():
+    current_mode = state["mode"]
     text_lines = macropad.display_text(title="SELECT MODE")
 
     text_lines[0].text = "> {}".format(modes[current_mode]["title"])
@@ -64,48 +69,64 @@ def mode_select_view():
 
 
 def select_mode():
-    global current_mode
-    global last_position
-
     encoder_pos = macropad.encoder
-    if (encoder_pos > last_position):
-        current_mode += 1
-        current_mode %= len(modes)
-        last_position = encoder_pos
+    if (encoder_pos > state["last_position"]):
+        state["mode"] += 1
+        state["mode"] %= len(modes)
+        state["last_position"] = encoder_pos
         mode_select_view()
 
-    if macropad.encoder < last_position:
-        current_mode -= 1
-        current_mode %= len(modes)
-        last_position = encoder_pos
+    if macropad.encoder < state["last_position"]:
+        state["mode"] -= 1
+        state["mode"] %= len(modes)
+        state["last_position"] = encoder_pos
         mode_select_view()
 
 
 # MEDIA CONTROLS
 
+media_map = [
+    234,  # previous track
+    232,  # play/pause
+    235,  # next track
+    111,  # toggle mic
+    239,  # toggle audio
+    macropad.ConsumerControlCode.PLAY_PAUSE,
+    123,  # cut
+    124,  # copy
+    125,  # paste
+    macropad.ConsumerControlCode.PLAY_PAUSE,
+    macropad.ConsumerControlCode.PLAY_PAUSE,
+    macropad.ConsumerControlCode.PLAY_PAUSE,
+]
+
+
 def media_view():
     disp = macropad.display_text(title="MEDIA")
-    disp[0].text = "ddddd"
-    disp[1].text = "green"
-    disp[2].text = "bluedddd"
+    disp[0].text = "prev play/pause next"
+    disp[1].text = "mic mute ____"
+    disp[2].text = "cut copy paste"
+    disp[2].text = "____ ____ ____"
 
     disp.show()
 
 
-def media_controls():
-    global last_position
-
+def media_controls(key_events):
     encoder_pos = macropad.encoder
 
-    if macropad.encoder > last_position:
+    if macropad.encoder > state["last_position"]:
         macropad.consumer_control.send(
             macropad.ConsumerControlCode.VOLUME_INCREMENT)
-        last_position = encoder_pos
+        state["last_position"] = encoder_pos
 
-    if macropad.encoder < last_position:
+    if macropad.encoder < state["last_position"]:
         macropad.consumer_control.send(
             macropad.ConsumerControlCode.VOLUME_DECREMENT)
-        last_position = encoder_pos
+        state["last_position"] = encoder_pos
+
+    if key_events:
+        if key_events.pressed:
+            macropad.keyboard.send(media_map[key_events.key_number])
 
 # RGB
 
@@ -113,27 +134,39 @@ def media_controls():
 def rgb_view():
     text_lines = macropad.display_text(title="RGB")
 
-    text_lines[0].text = "Brightness {}".format(brightness)
-    text_lines[1].text = "green"
-    text_lines[2].text = "blue"
+    text_lines[0].text = "R {} - G {} - B{}".format(
+        state["color"]["r"], state["color"]["g"], state["color"]["b"])
+    text_lines[1].text = "Brightness {}".format(state["brightness"])
 
     text_lines.show()
 
 
-def rgb():
-    global last_position
-    global brightness
-
+def rgb(key_events):
     encoder_pos = macropad.encoder
 
-    if macropad.encoder > last_position:
-        brightness += 0.05
-        last_position = encoder_pos
+    if macropad.encoder > state["last_position"]:
+        state["last_position"] = encoder_pos
+        if 0 in state["pressed_keys"]:
+            state["color"]["r"] = (state["color"]["r"] + 10) % 255
+        if 1 in state["pressed_keys"]:
+            state["color"]["g"] = (state["color"]["g"] + 10) % 255
+        if 2 in state["pressed_keys"]:
+            state["color"]["b"] = (state["color"]["b"] + 10) % 255
+        if 3 in state["pressed_keys"]:
+            state["brightness"] = round((state["brightness"] + 0.02) % 1, 2)
         rgb_view()
 
-    if macropad.encoder < last_position:
-        brightness -= 0.05
-        last_position = encoder_pos
+    if macropad.encoder < state["last_position"]:
+        if 0 in state["pressed_keys"]:
+            state["color"]["r"] = (state["color"]["r"] - 10) % 255
+        if 1 in state["pressed_keys"]:
+            state["color"]["g"] = (state["color"]["g"] - 10) % 255
+        if 2 in state["pressed_keys"]:
+            state["color"]["b"] = (state["color"]["b"] - 10) % 255
+        if 3 in state["pressed_keys"]:
+            state["brightness"] = round((state["brightness"] - 0.02) % 1, 2)
+
+        state["last_position"] = encoder_pos
         rgb_view()
 
 # MAIN LOOP
@@ -146,25 +179,34 @@ modes = [
 ]
 
 
-modes[current_mode]["view"]()
+modes[state["mode"]]["view"]()
 
 while True:
-    if mode_select:
+
+    macropad.pixels.brightness = state["brightness"]
+    macropad.pixels.fill(
+        (state["color"]["r"], state["color"]["g"], state["color"]["b"]))
+
+    key_events = macropad.keys.events.get()
+    if key_events:
+        if key_events.pressed:
+            state["pressed_keys"].add(key_events.key_number)
+        elif key_events.released:
+            state["pressed_keys"].remove(key_events.key_number)
+
+    if state["mode_select"]:
         select_mode()
     else:
-        modes[current_mode]["func"]()
-
-    macropad.pixels.brightness = brightness
-    macropad.pixels.fill(color)
+        modes[state["mode"]]["func"](key_events)
 
     # ENCODER LOGIC
 
     macropad.encoder_switch_debounced.update()
 
     if macropad.encoder_switch_debounced.pressed:
-        mode_select = not mode_select
+        state["mode_select"] = not state["mode_select"]
 
-        if mode_select:
+        if state["mode_select"]:
             mode_select_view()
         else:
-            modes[current_mode]["view"]()
+            modes[state["mode"]]["view"]()

@@ -12,7 +12,25 @@ Modes:
 
 Adafruit's
 [getting started guide](https://learn.adafruit.com/adafruit-macropad-rp2040) is
-a bit verbose. Download the adafruit circuitpython bundle
+thorough but a bit verbose if this ain't your first rodeo. The TLDR:
+
+### install circuitpython on the macropad
+
+- Download the latest CircuitPython that will work with Macropad
+  [here](https://circuitpython.org/board/adafruit_macropad_rp2040/).
+- Enter the macropad bootloader by hoding down the rotary encoder and then
+  clicking the reset button (on the left side)
+- Extract the zip and drag the UF2 file into the Macropad folder
+- The bootloader drive will die and be reborn as a drive called `CIRCUITPY`
+- Now you can edit the code, in `code.py`!
+
+### set up editor
+
+I used this
+[VSCode extension](https://marketplace.visualstudio.com/items?itemName=joedevivo.vscode-circuitpython)
+instead of the Mu editor. It has a serial monitor and auto-updates on save.
+
+Download the adafruit circuitpython bundle
 [here](https://circuitpython.org/libraries). You will need the following
 libraries:
 
